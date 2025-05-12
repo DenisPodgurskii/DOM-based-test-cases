@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Test: postMessage Sink</title></head>
+<body>
+  <h1>postMessage Sink Test</h1>
+  <label for="sourceType">Source:</label>
+  <select id="sourceType">
+    <option value="inline">Inline</option>
+    <option value="query">Query Param</option>
+    <option value="hash">Hash</option>
+  </select>
+  <input type="text" id="payload" placeholder="Enter payload">
+  <button id="runBtn">Run Sink</button>
+
+  <script src="js/post_message.js"></script>
+  <script>
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const runBtn = document.getElementById('runBtn');
+    const sourceType = document.getElementById('sourceType');
+    const payload = document.getElementById('payload');
+    runBtn.addEventListener('click', ()=>{
+      const type = sourceType.value;
+      const val = payload.value;
+      if(type === 'inline'){
+        runSink(val);
+      } else if(type === 'query'){
+        const u = new URL(location);
+        u.searchParams.set('payload', val);
+        location.href = u;
+      } else if(type === 'hash'){
+        location.hash = encodeURIComponent(val);
+      }
+    });
+    const params = new URLSearchParams(location.search);
+    if(params.has('payload')){
+      runSink(params.get('payload'));
+    }
+    if(location.hash){
+      runSink(decodeURIComponent(location.hash.slice(1)));
+    }
+  });
+  </script>
+</body>
+</html>

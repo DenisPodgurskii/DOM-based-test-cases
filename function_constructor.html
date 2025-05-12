@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Test: Function Sink</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+
+    th {
+      background: #f0f0f0;
+      text-align: left;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Function Sink Test</h1>
+  <h3><a href="/">Back to all test cases</a></h3>
+  <table>
+    <tr>
+      <th>Source</th>
+      <th>Action</th>
+    </tr>
+
+    <!-- Inline -->
+    <tr>
+      <td>Inline</td>
+      <td>
+        <input id="inlineVal" placeholder="Enter payload">
+        <button onclick="runSink(document.getElementById('inlineVal').value)">
+          Run
+        </button>
+      </td>
+    </tr>
+
+    <!-- Query Param -->
+    <tr>
+      <td>Query Param</td>
+      <td>
+        <input id="queryVal" placeholder="Enter payload">
+        <button onclick="
+          const queryV = document.getElementById('queryVal').value;
+          location.search = '?payload=' + encodeURIComponent(queryV);
+        ">Set & Reload</button>
+      </td>
+    </tr>
+
+    <!-- Hash -->
+    <tr>
+      <td>Hash</td>
+      <td>
+        <input id="hashVal" placeholder="Enter payload">
+        <button onclick="
+          const hashV = document.getElementById('hashVal').value;
+          location.hash = encodeURIComponent(hashV);
+        ">Set Hash</button>
+      </td>
+    </tr>
+
+    <!-- Cookie -->
+    <tr>
+      <td>Cookie</td>
+      <td>
+        <span id="cookieVal"></span>
+        <button onclick="
+          runSink(getCookie('payload'));
+        ">Run</button>
+      </td>
+    </tr>
+
+    <!-- Local Storage -->
+    <tr>
+      <td>Local Storage</td>
+      <td>
+        <span id="lsVal"></span>
+        <button onclick="runSink(localStorage.getItem('payload'))">
+          Run
+        </button>
+      </td>
+    </tr>
+
+    <!-- Session Storage -->
+    <tr>
+      <td>Session Storage</td>
+      <td>
+        <span id="ssVal"></span>
+        <button onclick="runSink(sessionStorage.getItem('payload'))">
+          Run
+        </button>
+      </td>
+    </tr>
+
+    <!-- window.name -->
+    <tr>
+      <td>window.name</td>
+      <td>
+        <span id="wnVal"></span>
+        <button onclick="runSink(window.name)">
+          Run
+        </button>
+      </td>
+    </tr>
+
+    <!-- Referrer -->
+    <tr>
+      <td>Referrer</td>
+      <td>
+        <span id="refVal"></span>
+        <button onclick="runSink(document.referrer)">
+          Run
+        </button>
+      </td>
+    </tr>
+  </table>
+
+  <script src="js/lib.js"></script>
+  <script src="js/function_constructor.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1) Clear storage so each test is fresh
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Set cookie
+      document.cookie = '';
+      const cs = 'payload=cVal' + Date.now() + ';path=/';
+      document.cookie = cs;
+      document.getElementById('cookieVal').textContent = cs;
+
+
+      // 2) Prepopulate storage & window.name with unique values
+      const ls = 'ls-' + Date.now();
+      localStorage.setItem('payload', ls);
+      document.getElementById('lsVal').textContent = ls;
+
+      const ss = 'ss-' + Date.now();
+      sessionStorage.setItem('payload', ss);
+      document.getElementById('ssVal').textContent = ss;
+
+      const wn = 'wn-' + Date.now();
+      window.name = wn;
+      document.getElementById('wnVal').textContent = wn;
+
+      // 3) Show document.referrer
+      document.getElementById('refVal').textContent = document.referrer || '(none)';
+
+      // 4) Auto‐run on load for query/hash (so Reload and Hash buttons work)
+      const params = new URLSearchParams(location.search);
+      if (params.has('payload')) {
+        runSink(params.get('payload'));
+      }
+      if (location.hash) {
+        runSink(decodeURIComponent(location.hash.slice(1)));
+      }
+    });
+
+    // Also catch hash changes without reload
+    window.addEventListener('hashchange', () => {
+      runSink(decodeURIComponent(location.hash.slice(1)));
+    });
+  </script>
+</body>
+
+</html>
