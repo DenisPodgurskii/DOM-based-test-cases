@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DOM Cookie Manipulation Test Cases</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding: 18px; }
+    pre { background:#f7f7f8; padding:12px; border-radius:6px; overflow:auto; }
+    section { margin-bottom:20px; }
+    .ok { color: #0b6; }
+    .bad { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>DOM Cookie Manipulation — Test Cases</h1>
+  <p>Open the console to see what runs. Use query string, hash, or the input to simulate attacker-controlled values.</p>
+
+  <section>
+    <h2>1) Direct assignment — basic</h2>
+    <p>Should trigger: <code>no-document-cookie-assignment</code> pattern + taint rule if RHS is tainted.</p>
+    <pre id="case1">// direct assignment (document.cookie)</pre>
+    <script>
+      // CASE 1: direct assignment with literal (benign)
+      document.cookie = "site_mode=lite; path=/"; // pattern: document.cookie assignment (low)
+    </script>
+  </section>
+
+  <section>
+    <h2>2) Direct assignment — from untrusted source (location.search)</h2>
+    <p>Should trigger: <code>cookie-manipulation-taint</code> (medium)</p>
+    <pre id="case2">// from location.search (tainted)</pre>
+    <script>
+      // URL example: ?evilCookie=1
+      const params = new URLSearchParams(location.search);
+      const ev = params.get("evilCookie");
+      if (ev) {
+        // Tainted source -> sink
+        document.cookie = "attacker=" + ev + "; path=/"; // taint flow: location:search -> document.cookie
+        console.log("Wrote cookie from search param:", ev);
+      }
+    </script>
+  </section>
+
+  <section>
+    <h2>3) Bracket access (document['cookie'])</h2>
+    <p>Should trigger: <code>no-document-cookie-assignment</code></p>
+    <pre id="case3">// bracket style</pre>
+    <script>
+      document['cookie'] = "bracket_case=1"; // pattern: document['cookie'] assignment
+    </script>
+  </section>
+
+  <section>
+    <h2>4) Concatenation style (binary +)</h2>
+    <p>Should trigger pattern rule that matches binary concatenation and/or taint flow.</p>
+    <pre id="case4">// concatenation with tainted input</pre>
+    <script>
+      const name = "u"; // normally from user
+      const val = location.hash ? location.hash.slice(1) : "none"; // tainted if hash provided
+      document.cookie = name + "=" + val + "; path=/"; // binaryExpression + assignment
+    </script>
+  </section>
+
+  <section>
+    <h2>5) Wrapper function setCookie(name, value)</h2>
+    <p>Should trigger: <code>cookie-wrapper-setters</code> (pattern sink) and taint rule if args are tainted.</p>
+    <pre id="case5">// setCookie wrapper</pre>
+    <script>
+      function setCookie(name, value, days) {
+        // naive wrapper that writes to document.cookie
+        const expires = days ? "; expires=" + (new Date(Date.now() + days*864e5)).toUTCString() : "";
+        document.cookie = name + "=" + value + expires + "; path=/";
+      }
+
+      // simulate tainted value from an input
+      const input = document.createElement("input");
+      input.value = "from_input"; // replace with attacker input on page
+      document.body.appendChild(input);
+
+      // calling wrapper with input.value (tainted)
+      setCookie("wrapperTest", input.value);
+    </script>
+  </section>
+
+  <section>
+    <h2>6) Cookies.* library-style (Cookies.set)</h2>
+    <p>Should trigger: <code>cookie-wrapper-setters</code> patterns matching <code>Cookies.set</code> or <code>Cookie.set</code>.</p>
+    <pre id="case6">// Cookies.set wrapper simulation</pre>
+    <script>
+      // Minimal cookies helper to simulate common libs (e.g., js-cookie)
+      const Cookies = {
+        set: function (name, value, options) {
+          // underlying write
+          document.cookie = name + "=" + value + (options && options.path ? "; path=" + options.path : "");
+        }
+      };
+
+      // tainted example: postMessage data -> cookie
+      window.addEventListener("message", (ev) => {
+        const d = ev.data;
+        if (typeof d === "string" && d.startsWith("cook:")) {
+          Cookies.set("postCookie", d.slice(5));
+        }
+      }, false);
+
+      // simulate a message (in same-origin test only)
+      window.postMessage("cook:from_postmsg", location.origin);
+    </script>
+  </section>
+
+  <section>
+    <h2>7) localStorage / sessionStorage -> cookie</h2>
+    <p>Should trigger taint: <code>storage:local_getItem</code> -> cookie sink</p>
+    <pre id="case7">// localStorage -> document.cookie</pre>
+    <script>
+      localStorage.setItem("maybeBad", "lsValue");
+      const maybe = localStorage.getItem("maybeBad");
+      if (maybe) {
+        document.cookie = "ls=" + maybe + "; path=/"; // taint flow from storage -> cookie
+      }
+    </script>
+  </section>
+
+  <section>
+    <h2>8) "Safe" example: encodeURIComponent & allow-listing</h2>
+    <p>Should be considered safer (may or may not be caught depending on sanitizers/config); shows an allow-list check.</p>
+    <pre id="case8">// allowlist & encoder</pre>
+    <script>
+      const allowed = ["0","1","alpha"];
+      const p = new URLSearchParams(location.search);
+      const v = p.get("safe");
+      if (v && allowed.includes(v)) {
+        // allow-listed -> safer (should not be flagged as exploitable value)
+        document.cookie = "safe=" + v + "; path=/";
+      }
+
+      // Encoding example - encoding does not prevent logic abuse but escapes separators
+      const raw = p.get("raw");
+      if (raw) {
+        document.cookie = "enc=" + encodeURIComponent(raw) + "; path=/";
+      }
+    </script>
+  </section>
+
+  <section>
+    <h2>9) Edge/No-op: attempt to set HttpOnly (impossible via JS)</h2>
+    <p>Note: you cannot set HttpOnly via <code>document.cookie</code>. This demonstrates a developer misconception.</p>
+    <pre id="case9">// HttpOnly cannot be set by JS</pre>
+    <script>
+      // This will not create an HttpOnly cookie. Servers must set HttpOnly.
+      document.cookie = "session=jsset; HttpOnly; path=/";
+    </script>
+  </section>
+
+  <section>
+    <h2>10) Complex wrapper that sanitizes (example)</h2>
+    <p>Wrapper that tries to sanitize — depending on your sanitizer list this may be considered safe/unsafe.</p>
+    <pre id="case10">// sanitized wrapper - naive</pre>
+    <script>
+      function safeSetCookie(name, value) {
+        // naive sanitizer: remove semicolon and equals
+        const clean = String(value).replace(/[;=]/g, "");
+        document.cookie = name + "=" + clean + "; path=/";
+      }
+
+      safeSetCookie("safeWrap", "cleanValue");
+    </script>
+  </section>
+
+  <hr />
+  <small>Test notes:
+    <ul>
+      <li>To test taint rules, append query params or hash to the URL (e.g., <code>?evilCookie=1</code> or <code>#hashval</code>).</li>
+      <li>Use the input element in case 5 to change the value before calling <code>setCookie</code> manually from console if you want different values.</li>
+      <li>Wrapper names included: <code>setCookie</code>, <code>set_cookie</code> (not shown but easily added), <code>Cookie.set</code>, <code>Cookies.set</code>.</li>
+    </ul>
+  </small>
+
+  <script>
+    // helper to log existing cookies
+    console.log("Existing document.cookie at load:", document.cookie);
+    setTimeout(() => console.log("document.cookie after run:", document.cookie), 250);
+  </script>
+</body>
+</html>
