@@ -1,175 +1,176 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Test: document.write Sink</title>
+  <meta charset="utf-8" />
+  <title>DOM-based test cases — document.write / writeln (inline + external)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-
-    th,
-    td {
-      border: 1px solid #ccc;
-      padding: 8px;
-    }
-
-    th {
-      background: #f0f0f0;
-      text-align: left;
-    }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding: 20px; line-height: 1.5; }
+    h1 { font-size: 20px; margin-bottom: 6px; }
+    h2 { font-size: 16px; margin-top: 22px; margin-bottom: 8px; }
+    .case { border: 1px solid #ddd; padding: 12px; margin: 10px 0; border-radius: 6px; background: #fafafa; }
+    .meta { font-size: 12px; color: #555; margin-bottom: 8px; }
+    pre { background:#fff; border:1px solid #eee; padding:8px; overflow:auto; font-size:13px; }
+    .control { margin:8px 0;}
+    a.btn { display:inline-block; padding:6px 8px; background:#0069d9; color:#fff; text-decoration:none; border-radius:4px; font-size:13px; }
   </style>
 </head>
-
 <body>
-  <h1>document.write Sink Test</h1>
-  <h3><a href="index.html">Back to all test cases</a></h3>
-  <table>
-    <tr>
-      <th>Source</th>
-      <th>Action</th>
-    </tr>
+  <h1>DOM-based test cases — <code>document.write</code> &amp; <code>writeln</code></h1>
+  <p class="meta">This page intentionally mixes <strong>inline</strong> and <strong>external</strong> script cases so SAST can find both.</p>
 
-    <!-- Inline -->
-    <tr>
-      <td>Inline</td>
-      <td>
-        <input id="inlineVal" placeholder="Enter payload">
-        <button onclick="runSink(document.getElementById('inlineVal').value)">
-          Run
-        </button>
-      </td>
-    </tr>
+  <p>
+    Quick controls:
+    <a class="btn" href="?name=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E">Use query payload</a>
+    <a class="btn" id="hashlink" href="#set-hash">Set hash payload</a>
+  </p>
 
-    <!-- Query Param -->
-    <tr>
-      <td>Query Param</td>
-      <td>
-        <input id="queryVal" placeholder="Enter payload">
-        <button onclick="
-          const queryV = document.getElementById('queryVal').value;
-          location.search = '?payload=' + encodeURIComponent(queryV);
-        ">Set & Reload</button>
-      </td>
-    </tr>
-
-    <!-- Hash -->
-    <tr>
-      <td>Hash</td>
-      <td>
-        <input id="hashVal" placeholder="Enter payload">
-        <button onclick="
-          const hashV = document.getElementById('hashVal').value;
-          location.hash = encodeURIComponent(hashV);
-        ">Set Hash</button>
-      </td>
-    </tr>
-
-    <!-- Cookie -->
-    <tr>
-      <td>Cookie</td>
-      <td>
-        <span id="cookieVal"></span>
-        <button onclick="
-          runSink(getCookie('payload'));
-        ">Run</button>
-      </td>
-    </tr>
-
-    <!-- Local Storage -->
-    <tr>
-      <td>Local Storage</td>
-      <td>
-        <span id="lsVal"></span>
-        <button onclick="runSink(localStorage.getItem('payload'))">
-          Run
-        </button>
-      </td>
-    </tr>
-
-    <!-- Session Storage -->
-    <tr>
-      <td>Session Storage</td>
-      <td>
-        <span id="ssVal"></span>
-        <button onclick="runSink(sessionStorage.getItem('payload'))">
-          Run
-        </button>
-      </td>
-    </tr>
-
-    <!-- window.name -->
-    <tr>
-      <td>window.name</td>
-      <td>
-        <span id="wnVal"></span>
-        <button onclick="runSink(window.name)">
-          Run
-        </button>
-      </td>
-    </tr>
-
-    <!-- Referrer -->
-    <tr>
-      <td>Referrer</td>
-      <td>
-        <span id="refVal"></span>
-        <button onclick="runSink(document.referrer)">
-          Run
-        </button>
-      </td>
-    </tr>
-  </table>
-
-
-  <script src="js/lib.js"></script>
-  <script src="js/document_write.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // 1) Clear storage so each test is fresh
-      localStorage.clear();
-      sessionStorage.clear();
-
-      // Set cookie
-      document.cookie = '';
-      const cs = 'payload=cVal' + Date.now() + ';path=/';
-      document.cookie = cs;
-      document.getElementById('cookieVal').textContent = cs;
-
-
-      // 2) Prepopulate storage & window.name with unique values
-      const ls = 'ls-' + Date.now();
-      localStorage.setItem('payload', ls);
-      document.getElementById('lsVal').textContent = ls;
-
-      const ss = 'ss-' + Date.now();
-      sessionStorage.setItem('payload', ss);
-      document.getElementById('ssVal').textContent = ss;
-
-      const wn = 'wn-' + Date.now();
-      window.name = wn;
-      document.getElementById('wnVal').textContent = wn;
-
-      // 3) Show document.referrer
-      document.getElementById('refVal').textContent = document.referrer || '(none)';
-
-      // 4) Auto‐run on load for query/hash (so Reload and Hash buttons work)
-      const params = new URLSearchParams(location.search);
-      if (params.has('payload')) {
-        runSink(params.get('payload'));
-      }
-      if (location.hash) {
-        runSink(decodeURIComponent(location.hash.slice(1)));
-      }
-    });
-
-    // Also catch hash changes without reload
-    window.addEventListener('hashchange', () => {
-      runSink(decodeURIComponent(location.hash.slice(1)));
-    });
+    function setHashPayload() {
+      location.hash = encodeURIComponent("<img src=x onerror=alert(1)>");
+    }
+    document.getElementById('hashlink').addEventListener('click', function(e){ e.preventDefault(); setHashPayload(); });
   </script>
-</body>
 
+  <!-- ───────────── INLINE CASES (kept concise but comprehensive) ───────────── -->
+
+  <h2>Inline cases</h2>
+
+  <div class="case" id="il-1">
+    <div class="meta">INLINE-1: direct hash → write (vuln)</div>
+    <pre>// inline-script[#1]
+document.write(location.hash);</pre>
+    <script>
+      document.write(location.hash);
+    </script>
+  </div>
+
+  <div class="case" id="il-2">
+    <div class="meta">INLINE-2: decoded hash → write (vuln)</div>
+    <pre>// inline-script[#2]
+document.write(decodeURIComponent(location.hash.slice(1)));</pre>
+    <script>
+      document.write(decodeURIComponent(location.hash.slice(1)));
+    </script>
+  </div>
+
+  <div class="case" id="il-3">
+    <div class="meta">INLINE-3: aliasing from query → writeln (vuln)</div>
+    <pre>// inline-script[#3]
+var q = location.search.substring(1);
+q = decodeURIComponent(q);
+document.writeln(q);</pre>
+    <script>
+      var q = location.search.substring(1);
+      q = decodeURIComponent(q);
+      document.writeln(q);
+    </script>
+  </div>
+
+  <div class="case" id="il-4">
+    <div class="meta">INLINE-4: helper propagator (vuln)</div>
+    <pre>// inline-script[#4]
+function id(v){ return v; }
+var s = location.hash.slice(1);
+document.write(id(s));</pre>
+    <script>
+      function id(v){ return v; }
+      var s = location.hash.slice(1);
+      document.write(id(s));
+    </script>
+  </div>
+
+  <div class="case" id="il-5">
+    <div class="meta">INLINE-5: sanitized via escapeHtml (safe if sanitizer effective)</div>
+    <pre>// inline-script[#5]
+function escapeHtml(x){ /* naive */ ... }
+document.write(escapeHtml(location.hash.slice(1)));</pre>
+    <script>
+      function escapeHtml(unsafe) {
+        if (!unsafe) return "";
+        return String(unsafe)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+      }
+      document.write(escapeHtml(location.hash.slice(1)));
+    </script>
+  </div>
+
+  <div class="case" id="il-6">
+    <div class="meta">INLINE-6: member access variations (vuln)</div>
+    <pre>// inline-script[#6]
+document['write'](location.hash);
+window.document.writeln(location.search);</pre>
+    <script>
+      document['write'](location.hash);
+      window.document.writeln(location.search);
+    </script>
+  </div>
+
+  <div class="case" id="il-7">
+    <div class="meta">INLINE-7: concat + template literal (vuln)</div>
+    <pre>// inline-script[#7]
+var name = new URLSearchParams(location.search).get('name') || 'Guest';
+document.write('<div>Hello ' + name + '</div>');
+document.writeln(`<p>${name}</p>`);</pre>
+    <script>
+      var name = new URLSearchParams(location.search).get('name') || 'Guest';
+      document.write('<div>Hello ' + name + '</div>');
+      document.writeln(`<p>${name}</p>`);
+    </script>
+  </div>
+
+  <div class="case" id="il-8">
+    <div class="meta">INLINE-8: string-eval to call write (vuln)</div>
+    <pre>// inline-script[#8]
+var p = location.hash.slice(1);
+setTimeout("document.write('" + p + "')", 10);</pre>
+    <script>
+      var p = location.hash.slice(1);
+      setTimeout("document.write('" + p + "')", 10);
+    </script>
+  </div>
+
+  <!-- ───────────── EXTERNAL CASES (via /js/*) ───────────── -->
+
+  <h2>External cases</h2>
+
+  <div class="case">
+    <div class="meta"><strong>js/document_write_external_1.js</strong> — direct external sources (vuln)</div>
+    <pre>// uses location.hash, search (decoded), URLSearchParams, window.name → write/writeln</pre>
+  </div>
+
+  <div class="case">
+    <div class="meta"><strong>js/document_write_helpers.js</strong> — helpers &amp; sanitizers (mixed)</div>
+    <pre>// extEscapeHtml, extIdentity, extMaybeSanitize, extWriteFromInput</pre>
+
+    <div class="control">
+      <input id="ext_input" value="Try &lt;img src=x onerror=alert(1)&gt;">
+      <button onclick="extWriteFromInput('ext_input')">External helper: write input</button>
+    </div>
+  </div>
+
+  <div class="case">
+    <div class="meta"><strong>js/document_write_eval_wrappers.js</strong> — setTimeout string-eval, Function constructor, aliasing (vuln)</div>
+    <pre>// setTimeout('document.write(...)'), new Function('document.writeln(...)'), var w = document.write; w(payload)</pre>
+  </div>
+
+  <div class="case">
+    <div class="meta"><strong>js/document_write_event_handlers.js</strong> — external event handlers</div>
+    <pre>// extWriteOnClickHash(), extWriteFromField(id), delegated click handler</pre>
+    <div class="control">
+      <button onclick="extWriteOnClickHash()">External onclick write</button>
+      <button class="ext-write-button" data-field="ext_input">Delegated ext-write-button</button>
+    </div>
+  </div>
+
+  <hr />
+  <footer style="font-size:13px;color:#666;">PTK SAST testbed — document.write / writeln with inline &amp; external coverage</footer>
+
+  <!-- External script includes -->
+  <script src="js/document_write/document_write_helpers.js"></script>
+  <script src="js/document_write/document_write_external_1.js"></script>
+  <script src="js/document_write/document_write_eval_wrappers.js"></script>
+  <script src="js/document_write/document_write_event_handlers.js"></script>
+</body>
 </html>
