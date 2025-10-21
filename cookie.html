@@ -2,185 +2,303 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>DOM Cookie Manipulation Test Cases</title>
+  <title>DOM-based test cases — Cookie security</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding: 18px; }
-    pre { background:#f7f7f8; padding:12px; border-radius:6px; overflow:auto; }
-    section { margin-bottom:20px; }
-    .ok { color: #0b6; }
-    .bad { color: #c00; }
+    :root { --bg:#fafafa; --card:#ffffff; --border:#e5e7eb; --muted:#6b7280; --link:#0ea5e9; --btn:#2563eb; --btn-txt:#fff; --hi:#dc2626; --med:#d97706; --lo:#16a34a; --safe:#0891b2;}
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--bg); color:#111827; }
+    .container { max-width: 980px; margin: 0 auto; padding: 20px; }
+    .topbar { display:flex; align-items:center; gap:12px; margin-bottom: 8px; }
+    .back { text-decoration:none; color: var(--link); font-weight: 600; }
+    .title { margin: 0; font-size: 20px; }
+    .meta { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+    .summary { display:flex; gap:14px; flex-wrap: wrap; align-items:center; border:1px solid var(--border); background: var(--card); border-radius:8px; padding:8px 10px; margin: 8px 0 14px; font-size:13px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius: 999px; border:1px solid var(--border); background:#fff; }
+    .b-hi{border-color:#fecaca;color:var(--hi);background:#fff;}
+    .b-med{border-color:#fde68a;color:var(--med);background:#fff;}
+    .b-lo{border-color:#bbf7d0;color:var(--lo);background:#fff;}
+    .b-safe{border-color:#a5f3fc;color:var(--safe);background:#fff;}
+    .b-total{font-weight:600;}
+    .controls { display:flex; gap:10px; flex-wrap: wrap; margin: 12px 0 20px; }
+    .btn { display:inline-block; padding:8px 10px; background: var(--btn); color: var(--btn-txt); border-radius: 6px; text-decoration: none; font-size: 13px; border:0; cursor:pointer; }
+    .btn.secondary { background: #0ea5e9; }
+    .grid { display:grid; gap:14px; }
+    .section-title { font-size:16px; margin: 14px 0 6px; }
+    .card { background: var(--card); border:1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .card .card-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    pre { background:#f8fafc; border:1px solid var(--border); padding:10px; overflow:auto; font-size: 12.5px; border-radius:6px; margin: 8px 0; }
+    .field { display:flex; gap:8px; align-items:center; }
+    input[type="text"] { padding:8px; border:1px solid var(--border); border-radius:6px; width: 360px; }
+    code.inline { background:#f3f4f6; padding:2px 6px; border-radius:4px; }
+    footer { color: var(--muted); font-size:12px; margin-top: 24px; }
   </style>
+  <script>
+    // ---- Scenario counters (cards) ----
+    function updateSummary() {
+      const cards = [...document.querySelectorAll('.card[data-severity]')];
+      const counts = { high:0, medium:0, low:0, safe:0 };
+      for (const c of cards) {
+        const s = (c.getAttribute('data-severity')||'').toLowerCase();
+        if (counts[s] !== undefined) counts[s]++;
+      }
+      const total = cards.length;
+      const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.textContent=v; };
+      set('count-high', counts.high);
+      set('count-medium', counts.medium);
+      set('count-low', counts.low);
+      set('count-safe', counts.safe);
+      set('count-total', total);
+    }
+    document.addEventListener('DOMContentLoaded', updateSummary);
+  </script>
+  <script>
+  // Cookie findings computed from page source (inline + external)
+  // We classify:
+  //  - Medium: assignments to document.cookie whose RHS is (directly or via a var) derived from document.cookie
+  //  - Low: all other assignments to document.cookie
+  // No highs here by design; "Safe" is for demo-only scenarios.
+
+  async function computeCookieFindings() {
+    // 1) collect code blobs: inline <script> and fetched external JS (same-origin)
+    const blobs = [];
+
+    // inline scripts
+    for (const s of document.querySelectorAll('script:not([src])')) {
+      blobs.push({ origin: 'inline', url: location.href, code: s.textContent || '' });
+    }
+
+    // external scripts (dedupe)
+    const srcs = [...new Set(
+      [...document.querySelectorAll('script[src]')].map(s => s.getAttribute('src')).filter(Boolean)
+    )];
+
+    for (const src of srcs) {
+      try {
+        const res = await fetch(src, { credentials: 'same-origin' });
+        if (res.ok) {
+          const code = await res.text();
+          blobs.push({ origin: 'external', url: new URL(src, location.href).href, code });
+        }
+      } catch (e) { /* ignore fetch errors */ }
+    }
+
+    // 2) Very small static pass:
+    // Track variables that read from document.cookie, then see if those vars feed a write to document.cookie.
+    let low = 0, medium = 0;
+
+    const reAssignWrite = /document\s*\.\s*cookie\s*=\s*([^;]+);/g;
+    const reReadCookie  = /document\s*\.\s*cookie\s*(?:\.split\(|;|\)|$)/g;
+
+    // extremely light var usage tracker (per blob)
+    function classify(code) {
+      // Map of varName -> "fromCookie" boolean if var assigned from document.cookie (very approximate)
+      const fromCookie = new Set();
+
+      // capture simple `var x = document.cookie ...` or `let/const`
+      const reVarFromCookie = /\b(var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*document\s*\.\s*cookie\b/g;
+      let m;
+      while ((m = reVarFromCookie.exec(code))) {
+        fromCookie.add(m[2]);
+      }
+
+      // also catch `= document.cookie.split(...)`
+      const reVarFromCookieSplit = /\b(var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*document\s*\.\s*cookie\s*\.split\(/g;
+      while ((m = reVarFromCookieSplit.exec(code))) {
+        fromCookie.add(m[2]);
+      }
+
+      // now classify each assignment to document.cookie
+      reAssignWrite.lastIndex = 0;
+      let a;
+      while ((a = reAssignWrite.exec(code))) {
+        const rhs = a[1] || "";
+
+        // direct reads on RHS?
+        const rhsHasDocCookie = /\bdocument\s*\.\s*cookie\b/.test(rhs);
+
+        // rhs uses a var that came from cookie?
+        const rhsVars = rhs.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
+        const usesCookieVar = rhsVars.some(v => fromCookie.has(v));
+
+        if (rhsHasDocCookie || usesCookieVar) medium++;
+        else low++;
+      }
+    }
+
+    for (const b of blobs) classify(b.code);
+
+    // Update badges
+    const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.textContent=v; };
+    set('count-medium', medium);
+    set('count-low', low);
+    set('count-high', 0);
+    set('count-safe', document.querySelectorAll('.card[data-severity="safe"]').length); // optional
+    set('count-total', low + medium + (document.querySelectorAll('.card[data-severity="safe"]').length));
+    const mode = document.getElementById('summary-mode');
+    if (mode) mode.textContent = 'Static (cookie assignments)';
+  }
+
+  document.addEventListener('DOMContentLoaded', computeCookieFindings);
+</script>
 </head>
 <body>
-  <h1>DOM Cookie Manipulation — Test Cases</h1>
-  <p>Open the console to see what runs. Use query string, hash, or the input to simulate attacker-controlled values.</p>
+  <div class="container">
+    <div class="topbar">
+      <a class="back" href="index.html">← Back to index</a>
+      <h1 class="title">DOM-based test cases — <code>document.cookie</code> security</h1>
+    </div>
+    <div class="summary">
 
-  <section>
-    <h2>1) Direct assignment — basic</h2>
-    <p>Should trigger: <code>no-document-cookie-assignment</code> pattern + taint rule if RHS is tainted.</p>
-    <pre id="case1">// direct assignment (document.cookie)</pre>
-    <script>
-      // CASE 1: direct assignment with literal (benign)
-      document.cookie = "site_mode=lite; path=/"; // pattern: document.cookie assignment (low)
-    </script>
-  </section>
+      <span class="badge b-hi">High: <strong id="count-high">0</strong></span>
+      <span class="badge b-med">Medium: <strong id="count-medium">0</strong></span>
+      <span class="badge b-lo">Low: <strong id="count-low">0</strong></span>
+      <span class="badge b-safe">Safe: <strong id="count-safe">0</strong></span>
+      <span class="badge b-total">Total: <strong id="count-total">0</strong></span>
+            <span id="summary-mode" class="meta" style="margin-left:auto;">Static</span>
+    </div>
+    <p class="meta">
+      This page contains **cookie manipulation** scenarios only: insecure attributes, user-controlled values, over-permissive scope,
+      deletion patterns, and leakage. There are <em>no</em> HTML sinks here (no <code>document.write</code>/<code>innerHTML</code>).
+    </p>
 
-  <section>
-    <h2>2) Direct assignment — from untrusted source (location.search)</h2>
-    <p>Should trigger: <code>cookie-manipulation-taint</code> (medium)</p>
-    <pre id="case2">// from location.search (tainted)</pre>
-    <script>
-      // URL example: ?evilCookie=1
-      const params = new URLSearchParams(location.search);
-      const ev = params.get("evilCookie");
-      if (ev) {
-        // Tainted source -> sink
-        document.cookie = "attacker=" + ev + "; path=/"; // taint flow: location:search -> document.cookie
-        console.log("Wrote cookie from search param:", ev);
-      }
-    </script>
-  </section>
+    <div class="controls">
+      <input id="cookieValue" type="text" value="%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E" />
+      <button class="btn" onclick="cookieUtils.setCookie('ptk_payload', document.getElementById('cookieValue').value, 1)">Set ptk_payload (raw)</button>
+      <button class="btn" onclick="cookieUtils.setCookie('ptk_payload', encodeURIComponent(document.getElementById('cookieValue').value), 1)">Set ptk_payload (encoded)</button>
+      <button class="btn" onclick="(function(){document.cookie='ptk_payload=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';alert('Cleared');})()">Clear ptk_payload</button>
+    </div>
 
-  <section>
-    <h2>3) Bracket access (document['cookie'])</h2>
-    <p>Should trigger: <code>no-document-cookie-assignment</code></p>
-    <pre id="case3">// bracket style</pre>
-    <script>
-      document['cookie'] = "bracket_case=1"; // pattern: document['cookie'] assignment
-    </script>
-  </section>
+    <!-- Inline scenarios (no sinks) -->
+    <h2 class="section-title">Inline scenarios</h2>
+    <div class="grid">
 
-  <section>
-    <h2>4) Concatenation style (binary +)</h2>
-    <p>Should trigger pattern rule that matches binary concatenation and/or taint flow.</p>
-    <pre id="case4">// concatenation with tainted input</pre>
-    <script>
-      const name = "u"; // normally from user
-      const val = location.hash ? location.hash.slice(1) : "none"; // tainted if hash provided
-      document.cookie = name + "=" + val + "; path=/"; // binaryExpression + assignment
-    </script>
-  </section>
+      <div class="card" data-severity="high" id="il-1">
+        <div class="card-meta">INLINE-1 (High): Set cookie from user-controlled <code>location.hash</code> without attributes</div>
+        <pre>// inline-script[#1]
+(function(){
+  var v = location.hash ? location.hash.slice(1) : '';
+  document.cookie = "ptk_from_hash=" + v + "; path=/";
+})();</pre>
+        <script>
+          (function(){
+            var v = location.hash ? location.hash.slice(1) : '';
+            document.cookie = "ptk_from_hash=" + v + "; path=/";
+          })();
+        </script>
+      </div>
 
-  <section>
-    <h2>5) Wrapper function setCookie(name, value)</h2>
-    <p>Should trigger: <code>cookie-wrapper-setters</code> (pattern sink) and taint rule if args are tainted.</p>
-    <pre id="case5">// setCookie wrapper</pre>
-    <script>
-      function setCookie(name, value, days) {
-        // naive wrapper that writes to document.cookie
-        const expires = days ? "; expires=" + (new Date(Date.now() + days*864e5)).toUTCString() : "";
-        document.cookie = name + "=" + value + expires + "; path=/";
-      }
+      <div class="card" data-severity="medium" id="il-2">
+        <div class="card-meta">INLINE-2 (Medium): Set cookie from <code>location.search</code> with <code>SameSite=None</code> but missing <code>Secure</code></div>
+        <pre>// inline-script[#2]
+(function(){
+  var q = location.search ? location.search.substring(1) : '';
+  document.cookie = "ptk_from_query=" + q + "; Path=/; SameSite=None";
+})();</pre>
+        <script>
+          (function(){
+            var q = location.search ? location.search.substring(1) : '';
+            document.cookie = "ptk_from_query=" + q + "; Path=/; SameSite=None";
+          })();
+        </script>
+      </div>
 
-      // simulate tainted value from an input
-      const input = document.createElement("input");
-      input.value = "from_input"; // replace with attacker input on page
-      document.body.appendChild(input);
+      <div class="card" data-severity="medium" id="il-3">
+        <div class="card-meta">INLINE-3 (Medium): Over-permissive scope — <code>Domain</code>=current hostname and <code>Path=/</code></div>
+        <pre>// inline-script[#3]
+(function(){
+  var host = location.hostname;
+  document.cookie = "ptk_scope=1; Domain=" + host + "; Path=/";
+})();</pre>
+        <script>
+          (function(){
+            var host = location.hostname;
+            document.cookie = "ptk_scope=1; Domain=" + host + "; Path=/";
+          })();
+        </script>
+      </div>
 
-      // calling wrapper with input.value (tainted)
-      setCookie("wrapperTest", input.value);
-    </script>
-  </section>
+      <div class="card" data-severity="low" id="il-4">
+        <div class="card-meta">INLINE-4 (Low): Excessive lifetime — far future expiry</div>
+        <pre>// inline-script[#4]
+(function(){
+  var d = new Date(); d.setFullYear(d.getFullYear() + 10);
+  document.cookie = "ptk_persist=1; Expires=" + d.toUTCString() + "; Path=/";
+})();</pre>
+        <script>
+          (function(){
+            var d = new Date(); d.setFullYear(d.getFullYear() + 10);
+            document.cookie = "ptk_persist=1; Expires=" + d.toUTCString() + "; Path=/";
+          })();
+        </script>
+      </div>
 
-  <section>
-    <h2>6) Cookies.* library-style (Cookies.set)</h2>
-    <p>Should trigger: <code>cookie-wrapper-setters</code> patterns matching <code>Cookies.set</code> or <code>Cookie.set</code>.</p>
-    <pre id="case6">// Cookies.set wrapper simulation</pre>
-    <script>
-      // Minimal cookies helper to simulate common libs (e.g., js-cookie)
-      const Cookies = {
-        set: function (name, value, options) {
-          // underlying write
-          document.cookie = name + "=" + value + (options && options.path ? "; path=" + options.path : "");
-        }
-      };
+      <div class="card" data-severity="safe" id="il-5">
+        <div class="card-meta">INLINE-5 (Safe): Proper attributes + encoded value</div>
+        <pre>// inline-script[#5]
+(function(){
+  var val = encodeURIComponent("safe-value");
+  document.cookie = "ptk_safe=" + val + "; Path=/; Secure; SameSite=Strict";
+})();</pre>
+        <script>
+          (function(){
+            var val = encodeURIComponent("safe-value");
+            document.cookie = "ptk_safe=" + val + "; Path=/; Secure; SameSite=Strict";
+          })();
+        </script>
+      </div>
+    </div>
 
-      // tainted example: postMessage data -> cookie
-      window.addEventListener("message", (ev) => {
-        const d = ev.data;
-        if (typeof d === "string" && d.startsWith("cook:")) {
-          Cookies.set("postCookie", d.slice(5));
-        }
-      }, false);
+    <!-- External scenarios -->
+    <h2 class="section-title">External scenarios (click to run)</h2>
+    <div class="grid">
 
-      // simulate a message (in same-origin test only)
-      window.postMessage("cook:from_postmsg", location.origin);
-    </script>
-  </section>
+      <div class="card" data-severity="high">
+        <div class="card-meta"><strong>Insecure sets (user-controlled values, weak attributes)</strong></div>
+        <div class="controls">
+          <button class="btn" onclick="runCookieFromHashNoAttrs()">EXT: from hash (no attributes)</button>
+          <button class="btn" onclick="runCookieFromQuerySameSiteNoneNoSecure()">EXT: SameSite=None, no Secure</button>
+          <button class="btn" onclick="runCookieWildcardScope()">EXT: broad scope (Domain/Path)</button>
+          <button class="btn" onclick="runCookieLongExpiry()">EXT: long expiry</button>
+        </div>
+      </div>
 
-  <section>
-    <h2>7) localStorage / sessionStorage -> cookie</h2>
-    <p>Should trigger taint: <code>storage:local_getItem</code> -> cookie sink</p>
-    <pre id="case7">// localStorage -> document.cookie</pre>
-    <script>
-      localStorage.setItem("maybeBad", "lsValue");
-      const maybe = localStorage.getItem("maybeBad");
-      if (maybe) {
-        document.cookie = "ls=" + maybe + "; path=/"; // taint flow from storage -> cookie
-      }
-    </script>
-  </section>
+      <div class="card" data-severity="high">
+        <div class="card-meta"><strong>Leakage / exfiltration</strong></div>
+        <div class="controls">
+          <button class="btn" onclick="runCookieLeakImage()">EXT: leak via Image beacon</button>
+          <button class="btn" onclick="runCookieLeakFetch()">EXT: leak via fetch()</button>
+          <button class="btn" onclick="runCookieLeakPostMessage()">EXT: leak via postMessage</button>
+        </div>
+        <p class="meta">Targets use <code>example.com</code> placeholders; adjust as needed for local testing.</p>
+      </div>
 
-  <section>
-    <h2>8) "Safe" example: encodeURIComponent & allow-listing</h2>
-    <p>Should be considered safer (may or may not be caught depending on sanitizers/config); shows an allow-list check.</p>
-    <pre id="case8">// allowlist & encoder</pre>
-    <script>
-      const allowed = ["0","1","alpha"];
-      const p = new URLSearchParams(location.search);
-      const v = p.get("safe");
-      if (v && allowed.includes(v)) {
-        // allow-listed -> safer (should not be flagged as exploitable value)
-        document.cookie = "safe=" + v + "; path=/";
-      }
+      <div class="card" data-severity="safe">
+        <div class="card-meta"><strong>Safe patterns</strong></div>
+        <div class="controls">
+          <button class="btn" onclick="runCookieSafeStrict()">EXT: Secure + SameSite=Strict + encoded</button>
+          <button class="btn" onclick="runCookieDeleteProper()">EXT: proper delete (Path=/)</button>
+        </div>
+      </div>
 
-      // Encoding example - encoding does not prevent logic abuse but escapes separators
-      const raw = p.get("raw");
-      if (raw) {
-        document.cookie = "enc=" + encodeURIComponent(raw) + "; path=/";
-      }
-    </script>
-  </section>
+      <div class="card" data-severity="medium">
+        <div class="card-meta"><strong>Event-driven cookie mutations</strong></div>
+        <div class="controls">
+          <input id="ext_cookie_input" type="text" value="user%3D123" />
+          <button class="btn" onclick="extCookieSetFromField('ext_cookie_input')">EXT: set from field (raw)</button>
+          <button class="btn ext-cookie-scope-button" data-field="ext_cookie_input">EXT: delegated — set with Domain/Path</button>
+        </div>
+      </div>
 
-  <section>
-    <h2>9) Edge/No-op: attempt to set HttpOnly (impossible via JS)</h2>
-    <p>Note: you cannot set HttpOnly via <code>document.cookie</code>. This demonstrates a developer misconception.</p>
-    <pre id="case9">// HttpOnly cannot be set by JS</pre>
-    <script>
-      // This will not create an HttpOnly cookie. Servers must set HttpOnly.
-      document.cookie = "session=jsset; HttpOnly; path=/";
-    </script>
-  </section>
+    </div>
 
-  <section>
-    <h2>10) Complex wrapper that sanitizes (example)</h2>
-    <p>Wrapper that tries to sanitize — depending on your sanitizer list this may be considered safe/unsafe.</p>
-    <pre id="case10">// sanitized wrapper - naive</pre>
-    <script>
-      function safeSetCookie(name, value) {
-        // naive sanitizer: remove semicolon and equals
-        const clean = String(value).replace(/[;=]/g, "");
-        document.cookie = name + "=" + clean + "; path=/";
-      }
+    <footer>PTK SAST testbed — Cookie security (no HTML sinks). <a class="back" href="index.html">Back to index</a></footer>
+  </div>
 
-      safeSetCookie("safeWrap", "cleanValue");
-    </script>
-  </section>
-
-  <hr />
-  <small>Test notes:
-    <ul>
-      <li>To test taint rules, append query params or hash to the URL (e.g., <code>?evilCookie=1</code> or <code>#hashval</code>).</li>
-      <li>Use the input element in case 5 to change the value before calling <code>setCookie</code> manually from console if you want different values.</li>
-      <li>Wrapper names included: <code>setCookie</code>, <code>set_cookie</code> (not shown but easily added), <code>Cookie.set</code>, <code>Cookies.set</code>.</li>
-    </ul>
-  </small>
-
-  <script>
-    // helper to log existing cookies
-    console.log("Existing document.cookie at load:", document.cookie);
-    setTimeout(() => console.log("document.cookie after run:", document.cookie), 250);
-  </script>
+  <!-- External scripts -->
+  <script src="js/cookie/cookie_utils.js"></script>
+  <script src="js/cookie/cookie_insecure_sets.js"></script>
+  <script src="js/cookie/cookie_leakage_cases.js"></script>
+  <script src="js/cookie/cookie_event_handlers.js"></script>
 </body>
 </html>

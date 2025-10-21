@@ -1,7 +1,5 @@
-// js/document_write_helpers.js
-// helper functions and simple sanitizers used by other external scripts
+// helpers & simple sanitizers — no auto-run
 
-// naive escapeHtml (for testing sanitized vs unsanitized flows)
 function extEscapeHtml(unsafe) {
   if (!unsafe) return "";
   return String(unsafe)
@@ -12,23 +10,19 @@ function extEscapeHtml(unsafe) {
     .replace(/'/g,'&#039;');
 }
 
-// helper that returns the same value (propagator)
 function extIdentity(v) { return v; }
 
-// helper that intentionally returns sanitized or raw depending on flag
 function extMaybeSanitize(v, sanitize) {
-  if (!sanitize) return v;
-  return extEscapeHtml(v);
+  return sanitize ? extEscapeHtml(v) : v;
 }
 
-// function that reads from an input element (external file usage)
 function extWriteFromInput(inputId) {
   var el = document.getElementById(inputId);
   if (!el) return;
-  document.write(el.value);
+  document.write(el.value); // literal sink (SAST-visible)
 }
 
-// export for non-module environments (make discoverable)
+// export
 window.extEscapeHtml = extEscapeHtml;
 window.extIdentity = extIdentity;
 window.extMaybeSanitize = extMaybeSanitize;

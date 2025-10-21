@@ -1,37 +1,31 @@
-// js/document_write_eval_wrappers.js
-// indirect-eval / constructor / aliasing tests
+// string-based timers / Function constructor / aliasing — no auto-run
 
-// 1. setTimeout string-eval that embeds payload
-(function(){
+function runExtSetTimeoutStringEval() {
   var p = location.hash ? location.hash.slice(1) : "";
-  // note: string-eval should lead to doc.write usage at runtime
-  // (scanner should detect this pattern as potentially dangerous)
-  setTimeout("document.write('EXT-SETTIMEOUT: ' + '" + p + "')", 10);
-})();
+  // literal string so SAST sees the pattern
+  setTimeout("document.write('EXT-SETTIMEOUT: ' + '" + p + "')", 30);
+}
 
-// 2. Function constructor building code that calls document.write
-(function(){
+function runExtFunctionConstructor() {
   var data = location.search ? location.search.substring(1) : "";
   var code = "document.writeln('EXT-FUNCTION-CONSTR: ' + decodeURIComponent('" + data + "'))";
   try {
     var f = new Function(code);
     f();
-  } catch(e) {
-    // swallow for testing runtime safety
-  }
-})();
+  } catch(e) {}
+}
 
-// 3. aliasing: store document.write into a variable externally
-(function(){
+function runExtAliasWrite() {
   var w = document.write;
   var payload = location.hash ? location.hash.slice(1) : "";
   if (typeof w === "function") {
     w("EXT-ALIAS-WRITE: " + payload);
   }
-})();
+}
 
-// 4. wrapper that forwards by concatenation/template
-(function(){
-  var n = new URLSearchParams(location.search).get('n') || "";
-  document.write(`<div>EXT-TEMPLATE: ${n}</div>`);
-})();
+// export
+Object.assign(window, {
+  runExtSetTimeoutStringEval,
+  runExtFunctionConstructor,
+  runExtAliasWrite
+});
