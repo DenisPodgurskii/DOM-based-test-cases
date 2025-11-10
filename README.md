@@ -14,6 +14,7 @@ DOM-based-test-cases/
 ├── inner_html.html             # Test for innerHTML/outerHTML sinks
 ├── insert_adjacent_html.html   # Test for insertAdjacentHTML sink
 ├── open_redirect.html          # Test for open-redirect sinks (window.open, location.assign, etc.)
+├── link_manipulation.html       # Test for anchor/link manipulation sinks
 ├── post_message.html           # Test for postMessage() sink
 └── js/                         # Supporting JavaScript for test pages
     ├── lib.js                  # Shared utility library (cookie/helpers, common functions)
@@ -24,6 +25,7 @@ DOM-based-test-cases/
     ├── inner_html.js           # Handler for innerHTML test
     ├── insert_adjacent_html.js # Handler for insertAdjacentHTML test
     ├── open_redirect.js        # Handler for open-redirect test
+    ├── link_manipulation.js    # Handler for link manipulation test
     └── post_message.js         # Handler for postMessage test
 ```
 

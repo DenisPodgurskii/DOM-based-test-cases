@@ -1,64 +1,25 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>DOM-based test cases — document.write / writeln</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root { --bg:#fafafa; --card:#ffffff; --border:#e5e7eb; --muted:#6b7280; --link:#0ea5e9; --btn:#2563eb; --btn-txt:#fff; --hi:#dc2626; --med:#d97706; --lo:#16a34a; --safe:#0891b2;}
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--bg); color:#111827; }
-    .container { max-width: 980px; margin: 0 auto; padding: 20px; }
-    .topbar { display:flex; align-items:center; gap:12px; margin-bottom: 8px; }
-    .back { text-decoration:none; color: var(--link); font-weight: 600; }
-    .title { margin: 0; font-size: 20px; }
-    .meta { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
-    .summary { display:flex; gap:14px; flex-wrap: wrap; align-items:center; border:1px solid var(--border); background: var(--card); border-radius:8px; padding:8px 10px; margin: 8px 0 14px; font-size:13px; }
-    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius: 999px; border:1px solid var(--border); background:#fff; }
-    .b-hi{border-color:#fecaca;color:var(--hi);background:#fff;}
-    .b-med{border-color:#fde68a;color:var(--med);background:#fff;}
-    .b-lo{border-color:#bbf7d0;color:var(--lo);background:#fff;}
-    .b-safe{border-color:#a5f3fc;color:var(--safe);background:#fff;}
-    .b-total{font-weight:600;}
-    .controls { display:flex; gap:10px; flex-wrap: wrap; margin: 12px 0 20px; }
-    .btn { display:inline-block; padding:8px 10px; background: var(--btn); color: var(--btn-txt); border-radius: 6px; text-decoration: none; font-size: 13px; border:0; cursor:pointer; }
-    .btn.secondary { background: #0ea5e9; }
-    .grid { display:grid; gap:14px; }
-    .section-title { font-size:16px; margin: 14px 0 6px; }
-    .card { background: var(--card); border:1px solid var(--border); border-radius: 8px; padding: 12px; }
-    .card .card-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-    pre { background:#f8fafc; border:1px solid var(--border); padding:10px; overflow:auto; font-size: 12.5px; border-radius:6px; margin: 8px 0; }
-    .field { display:flex; gap:8px; align-items:center; }
-    input[type="text"] { padding:8px; border:1px solid var(--border); border-radius:6px; width: 320px; }
-    footer { color: var(--muted); font-size:12px; margin-top: 24px; }
-  </style>
+  <link rel="stylesheet" href="./css/style.css" type="text/css" />
+  <!-- External script includes -->
+  <script src="js/sources.js"></script>
+  <script src="js/document_write/document_write_helpers.js"></script>
+
+  <script src="js/summary.js"></script>
   <script>
-    // helper to quickly set a hash payload for tests
-    function setHashPayload() {
-      location.hash = encodeURIComponent("<img src=x onerror=alert(1)>");
-    }
-    // findings counter: counts cards by data-severity
-    function updateSummary() {
-      const cards = [...document.querySelectorAll('.card[data-severity]')];
-      const counts = { high:0, medium:0, low:0, safe:0 };
-      for (const c of cards) {
-        const sev = (c.getAttribute('data-severity')||'').toLowerCase();
-        if (sev === 'high') counts.high++;
-        else if (sev === 'medium') counts.medium++;
-        else if (sev === 'low') counts.low++;
-        else if (sev === 'safe') counts.safe++;
-      }
-      const total = cards.length;
-      const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.textContent=v; };
-      set('count-high', counts.high);
-      set('count-medium', counts.medium);
-      set('count-low', counts.low);
-      set('count-safe', counts.safe);
-      set('count-total', total);
-    }
+    const DOMPurify = {};
+    DOMPurify.sanitize = function(input) {
+      return input;
+    };
     document.addEventListener('DOMContentLoaded', updateSummary);
   </script>
 </head>
+
 <body>
   <div class="container">
     <div class="topbar">
@@ -66,92 +27,79 @@
       <h1 class="title">DOM-based test cases — <code>document.write</code> / <code>writeln</code></h1>
     </div>
     <div class="summary">
-      <span class="badge b-hi">High: <strong id="count-high">0</strong></span>
-      <span class="badge b-med">Medium: <strong id="count-medium">0</strong></span>
-      <span class="badge b-lo">Low: <strong id="count-low">0</strong></span>
-      <span class="badge b-safe">Safe: <strong id="count-safe">0</strong></span>
-      <span class="badge b-total">Total: <strong id="count-total">0</strong></span>
+      <span class="badge b-hi">High: <strong id="count-high">11</strong></span>
+      <span class="badge b-med">Medium: <strong id="count-medium">1</strong></span>
+      <span class="badge b-lo">Low: <strong id="count-low">10</strong></span>
+      <span class="badge b-safe">Safe: <strong id="count-safe">1</strong></span>
+      <span class="badge b-total">Total: <strong id="count-total">23</strong></span>
     </div>
     <p class="meta">This page mixes <strong>inline</strong> and <strong>external</strong> test cases. External scripts don’t auto-run to avoid page replacement; trigger them with buttons.</p>
 
-    <div class="controls">
-      <a class="btn secondary" href="?name=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E">Use query payload</a>
-      <a class="btn secondary" href="#payload" onclick="event.preventDefault(); setHashPayload();">Set hash payload</a>
-    </div>
 
     <!-- Inline cases -->
     <h2 class="section-title">Inline cases</h2>
     <div class="grid">
 
-      <div class="card" id="il-1" data-severity="high">
-        <div class="card-meta">INLINE-1: direct hash → write (vuln)</div>
+      <div class="card" id="il-1" data-severity="high, low">
+        <div class="card-meta">INLINE-1 (High): direct hash → write (vuln)</div>
         <pre>// inline-script[#1]
 document.write(location.hash);</pre>
-        <script>document.write(location.hash);</script>
+        <script>
+          document.write(location.hash);
+        </script>
       </div>
 
-      <div class="card" id="il-2" data-severity="high">
-        <div class="card-meta">INLINE-2: decoded hash → write (vuln)</div>
+      <div class="card" id="il-2" data-severity="high, low">
+        <div class="card-meta">INLINE-2 (High): decoded hash → write (vuln)</div>
         <pre>// inline-script[#2]
 document.write(decodeURIComponent(location.hash.slice(1)));</pre>
-        <script>document.write(decodeURIComponent(location.hash.slice(1)));</script>
+        <script>
+          document.write(decodeURIComponent(location.hash.slice(1)));
+        </script>
       </div>
 
-      <div class="card" id="il-3" data-severity="high">
-        <div class="card-meta">INLINE-3: aliasing from query → writeln (vuln)</div>
+      <div class="card" id="il-3" data-severity="high, low">
+        <div class="card-meta">INLINE-3 (High): aliasing from query → writeln (vuln)</div>
         <pre>// inline-script[#3]
 var q = location.search.substring(1);
 q = decodeURIComponent(q);
 document.writeln(q);</pre>
         <script>
           var q = location.search.substring(1);
-          try { q = decodeURIComponent(q); } catch(e) {}
+          try {
+            q = decodeURIComponent(q);
+          } catch (e) {}
           document.writeln(q);
         </script>
       </div>
 
-      <div class="card" id="il-4" data-severity="high">
-        <div class="card-meta">INLINE-4: helper propagator (vuln)</div>
+      <div class="card" id="il-4" data-severity="high, low">
+        <div class="card-meta">INLINE-4 (High): helper propagator (vuln)</div>
         <pre>// inline-script[#4]
 function id(v){ return v; }
 var s = location.hash.slice(1);
 document.write(id(s));</pre>
         <script>
-          function id(v){ return v; }
+          function id(v) {
+            return v;
+          }
           var s = location.hash.slice(1);
           document.write(id(s));
         </script>
       </div>
 
-      <div class="card" id="il-5" data-severity="safe">
-        <div class="card-meta">INLINE-5: sanitized via escapeHtml (safe if sanitizer effective)</div>
+      <div class="card" id="il-5" data-severity="safe, low">
+        <div class="card-meta">INLINE-5: sanitized via DOMPurify.sanitize (safe if sanitizer effective)</div>
         <pre>// inline-script[#5]
-function escapeHtml(x){ /* naive */ }
-document.write(escapeHtml(location.hash.slice(1)));</pre>
+document.write(DOMPurify.sanitize(location.hash.slice(1)));</pre>
         <script>
-          function escapeHtml(unsafe) {
-            if (!unsafe) return "";
-            return String(unsafe)
-              .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-              .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-          }
-          document.write(escapeHtml(location.hash.slice(1)));
+          document.write(DOMPurify.sanitize(location.hash.slice(1)));
         </script>
       </div>
 
-      <div class="card" id="il-6" data-severity="high">
-        <div class="card-meta">INLINE-6: member access variations (vuln)</div>
-        <pre>// inline-script[#6]
-document['write'](location.hash);
-window.document.writeln(location.search);</pre>
-        <script>
-          document['write'](location.hash);
-          window.document.writeln(location.search);
-        </script>
-      </div>
 
-      <div class="card" id="il-7" data-severity="high">
-        <div class="card-meta">INLINE-7: concat + template literal (vuln)</div>
+      <div class="card" id="il-7" data-severity="high, low">
+        <div class="card-meta">INLINE-6 (High): concat + template literal (vuln)</div>
         <pre>// inline-script[#7]
 var name = new URLSearchParams(location.search).get('name') || 'Guest';
 document.write('<div>Hello ' + name + '</div>');
@@ -163,8 +111,8 @@ document.writeln(`<p>${name}</p>`);</pre>
         </script>
       </div>
 
-      <div class="card" id="il-8" data-severity="high">
-        <div class="card-meta">INLINE-8: string-eval → write (vuln) — <strong>click to run</strong></div>
+      <div class="card" id="il-8" data-severity="high, medium, low">
+        <div class="card-meta">INLINE-7 (High): string-eval → write (vuln) — <strong>click to run</strong></div>
         <pre>// inline-script[#8] (gated)
 function runInlineSetTimeoutEval() {
   var p = location.hash.slice(1);
@@ -180,57 +128,58 @@ function runInlineSetTimeoutEval() {
           }
         </script>
       </div>
+
+
+      <div class="card" id="il-8" data-severity="high, low">
+        <div class="card-meta">INLINE-8(High): document.addEventListener with extWriteFromInput</div>
+        <pre>// inline-script[#8] (gated)
+document.addEventListener('click', function(e){
+  var t = e && e.target;
+  if (t && t.matches && t.matches('.ext-write-button')) {
+    var id = t.getAttribute('data-field');
+    extWriteFromInput(id);
+  }
+});</pre>
+        <script>
+          document.addEventListener('click', function(e) {
+            var t = e && e.target;
+            if (t && t.matches && t.matches('.ext-write-button')) {
+              var id = t.getAttribute('data-field');
+              extWriteFromInput(id);
+            }
+          });
+        </script>
+      </div>
     </div>
 
     <!-- External cases -->
     <h2 class="section-title">External cases (click to run)</h2>
     <div class="grid">
 
-      <div class="card" data-severity="high">
+      <div class="card">
         <div class="card-meta"><strong>Direct/decoded/urlparam/window.name</strong> (no auto-run)</div>
+        <pre data-severity="high, low">onclick="runWrite(location.hash)"</pre>
         <div class="controls">
-          <button class="btn" onclick="runExtDirectHash()">EXT: direct hash → write</button>
-          <button class="btn" onclick="runExtDecodedSearch()">EXT: decode(search) → writeln</button>
-          <button class="btn" onclick="runExtUrlParam()">EXT: URLSearchParams(name) → write</button>
-          <button class="btn" onclick="runExtWindowName()">EXT: window.name → writeln</button>
+          <button class="btn" data-severity="high" onclick="runWrite(location.hash)">EXT (High): direct hash → runWrite helper</button>
+
+        </div>
+        <pre data-severity="high, low">onclick="runWrite(getCookieByName('name'))"</pre>
+        <div class="controls">
+          <button class="btn" data-severity="high" onclick="runWrite(getCookieByName('name'))">EXT (High): runWrite helper with ext source</button>
+
         </div>
       </div>
 
-      <div class="card" data-severity="high">
-        <div class="card-meta"><strong>Helpers &amp; sanitizers</strong></div>
-        <div class="field">
-          <input id="ext_input" type="text" value="Try &lt;img src=x onerror=alert(1)&gt;">
-          <button class="btn" onclick="extWriteFromInput('ext_input')">EXT: write from input</button>
-        </div>
-      </div>
 
-      <div class="card" data-severity="high">
-        <div class="card-meta"><strong>String-eval / Function constructor / aliasing</strong> (no auto-run)</div>
-        <div class="controls">
-          <button class="btn" onclick="runExtSetTimeoutStringEval()">EXT: setTimeout('document.write(...)')</button>
-          <button class="btn" onclick="runExtFunctionConstructor()">EXT: new Function('document.writeln(...)')</button>
-          <button class="btn" onclick="runExtAliasWrite()">EXT: alias document.write</button>
-        </div>
-      </div>
 
-      <div class="card" data-severity="high">
-        <div class="card-meta"><strong>External event handlers</strong></div>
-        <div class="controls">
-          <button class="btn" onclick="extWriteOnClickHash()">EXT: onclick hash → write</button>
-          <button class="btn ext-write-button" data-field="ext_input">EXT: delegated button (field)</button>
-        </div>
-        <p class="meta">Delegated handler is installed in <code>js/document_write/document_write_event_handlers.js</code>.</p>
-      </div>
+
 
     </div>
 
     <footer>PTK SAST testbed — document.write / writeln (inline + external). <a class="back" href="index.html">Back to index</a></footer>
   </div>
 
-  <!-- External script includes -->
-  <script src="js/document_write/document_write_helpers.js"></script>
-  <script src="js/document_write/document_write_external_1.js"></script>
-  <script src="js/document_write/document_write_eval_wrappers.js"></script>
-  <script src="js/document_write/document_write_event_handlers.js"></script>
+
 </body>
+
 </html>

@@ -1,147 +1,23 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>DOM-based test cases — Cookie security</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root { --bg:#fafafa; --card:#ffffff; --border:#e5e7eb; --muted:#6b7280; --link:#0ea5e9; --btn:#2563eb; --btn-txt:#fff; --hi:#dc2626; --med:#d97706; --lo:#16a34a; --safe:#0891b2;}
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--bg); color:#111827; }
-    .container { max-width: 980px; margin: 0 auto; padding: 20px; }
-    .topbar { display:flex; align-items:center; gap:12px; margin-bottom: 8px; }
-    .back { text-decoration:none; color: var(--link); font-weight: 600; }
-    .title { margin: 0; font-size: 20px; }
-    .meta { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
-    .summary { display:flex; gap:14px; flex-wrap: wrap; align-items:center; border:1px solid var(--border); background: var(--card); border-radius:8px; padding:8px 10px; margin: 8px 0 14px; font-size:13px; }
-    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius: 999px; border:1px solid var(--border); background:#fff; }
-    .b-hi{border-color:#fecaca;color:var(--hi);background:#fff;}
-    .b-med{border-color:#fde68a;color:var(--med);background:#fff;}
-    .b-lo{border-color:#bbf7d0;color:var(--lo);background:#fff;}
-    .b-safe{border-color:#a5f3fc;color:var(--safe);background:#fff;}
-    .b-total{font-weight:600;}
-    .controls { display:flex; gap:10px; flex-wrap: wrap; margin: 12px 0 20px; }
-    .btn { display:inline-block; padding:8px 10px; background: var(--btn); color: var(--btn-txt); border-radius: 6px; text-decoration: none; font-size: 13px; border:0; cursor:pointer; }
-    .btn.secondary { background: #0ea5e9; }
-    .grid { display:grid; gap:14px; }
-    .section-title { font-size:16px; margin: 14px 0 6px; }
-    .card { background: var(--card); border:1px solid var(--border); border-radius: 8px; padding: 12px; }
-    .card .card-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-    pre { background:#f8fafc; border:1px solid var(--border); padding:10px; overflow:auto; font-size: 12.5px; border-radius:6px; margin: 8px 0; }
-    .field { display:flex; gap:8px; align-items:center; }
-    input[type="text"] { padding:8px; border:1px solid var(--border); border-radius:6px; width: 360px; }
-    code.inline { background:#f3f4f6; padding:2px 6px; border-radius:4px; }
-    footer { color: var(--muted); font-size:12px; margin-top: 24px; }
-  </style>
+  <link rel="stylesheet" href="./css/style.css" type="text/css" />
+
+  <!-- External scripts -->
+  <script src="js/sources.js"></script>
+  <script src="js/cookie/cookie_sinks.js"></script>
+  <script src="js/cookie/cookie_insecure_sets.js"></script>
+
+  <script src="js/summary.js"></script>
   <script>
-    // ---- Scenario counters (cards) ----
-    function updateSummary() {
-      const cards = [...document.querySelectorAll('.card[data-severity]')];
-      const counts = { high:0, medium:0, low:0, safe:0 };
-      for (const c of cards) {
-        const s = (c.getAttribute('data-severity')||'').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      }
-      const total = cards.length;
-      const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.textContent=v; };
-      set('count-high', counts.high);
-      set('count-medium', counts.medium);
-      set('count-low', counts.low);
-      set('count-safe', counts.safe);
-      set('count-total', total);
-    }
     document.addEventListener('DOMContentLoaded', updateSummary);
   </script>
-  <script>
-  // Cookie findings computed from page source (inline + external)
-  // We classify:
-  //  - Medium: assignments to document.cookie whose RHS is (directly or via a var) derived from document.cookie
-  //  - Low: all other assignments to document.cookie
-  // No highs here by design; "Safe" is for demo-only scenarios.
-
-  async function computeCookieFindings() {
-    // 1) collect code blobs: inline <script> and fetched external JS (same-origin)
-    const blobs = [];
-
-    // inline scripts
-    for (const s of document.querySelectorAll('script:not([src])')) {
-      blobs.push({ origin: 'inline', url: location.href, code: s.textContent || '' });
-    }
-
-    // external scripts (dedupe)
-    const srcs = [...new Set(
-      [...document.querySelectorAll('script[src]')].map(s => s.getAttribute('src')).filter(Boolean)
-    )];
-
-    for (const src of srcs) {
-      try {
-        const res = await fetch(src, { credentials: 'same-origin' });
-        if (res.ok) {
-          const code = await res.text();
-          blobs.push({ origin: 'external', url: new URL(src, location.href).href, code });
-        }
-      } catch (e) { /* ignore fetch errors */ }
-    }
-
-    // 2) Very small static pass:
-    // Track variables that read from document.cookie, then see if those vars feed a write to document.cookie.
-    let low = 0, medium = 0;
-
-    const reAssignWrite = /document\s*\.\s*cookie\s*=\s*([^;]+);/g;
-    const reReadCookie  = /document\s*\.\s*cookie\s*(?:\.split\(|;|\)|$)/g;
-
-    // extremely light var usage tracker (per blob)
-    function classify(code) {
-      // Map of varName -> "fromCookie" boolean if var assigned from document.cookie (very approximate)
-      const fromCookie = new Set();
-
-      // capture simple `var x = document.cookie ...` or `let/const`
-      const reVarFromCookie = /\b(var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*document\s*\.\s*cookie\b/g;
-      let m;
-      while ((m = reVarFromCookie.exec(code))) {
-        fromCookie.add(m[2]);
-      }
-
-      // also catch `= document.cookie.split(...)`
-      const reVarFromCookieSplit = /\b(var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*document\s*\.\s*cookie\s*\.split\(/g;
-      while ((m = reVarFromCookieSplit.exec(code))) {
-        fromCookie.add(m[2]);
-      }
-
-      // now classify each assignment to document.cookie
-      reAssignWrite.lastIndex = 0;
-      let a;
-      while ((a = reAssignWrite.exec(code))) {
-        const rhs = a[1] || "";
-
-        // direct reads on RHS?
-        const rhsHasDocCookie = /\bdocument\s*\.\s*cookie\b/.test(rhs);
-
-        // rhs uses a var that came from cookie?
-        const rhsVars = rhs.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
-        const usesCookieVar = rhsVars.some(v => fromCookie.has(v));
-
-        if (rhsHasDocCookie || usesCookieVar) medium++;
-        else low++;
-      }
-    }
-
-    for (const b of blobs) classify(b.code);
-
-    // Update badges
-    const set = (id,v)=>{ const el=document.getElementById(id); if (el) el.textContent=v; };
-    set('count-medium', medium);
-    set('count-low', low);
-    set('count-high', 0);
-    set('count-safe', document.querySelectorAll('.card[data-severity="safe"]').length); // optional
-    set('count-total', low + medium + (document.querySelectorAll('.card[data-severity="safe"]').length));
-    const mode = document.getElementById('summary-mode');
-    if (mode) mode.textContent = 'Static (cookie assignments)';
-  }
-
-  document.addEventListener('DOMContentLoaded', computeCookieFindings);
-</script>
 </head>
+
 <body>
   <div class="container">
     <div class="topbar">
@@ -149,31 +25,31 @@
       <h1 class="title">DOM-based test cases — <code>document.cookie</code> security</h1>
     </div>
     <div class="summary">
-
-      <span class="badge b-hi">High: <strong id="count-high">0</strong></span>
+      <span class="badge b-hi">High: <strong id="count-high">7</strong></span>
       <span class="badge b-med">Medium: <strong id="count-medium">0</strong></span>
-      <span class="badge b-lo">Low: <strong id="count-low">0</strong></span>
-      <span class="badge b-safe">Safe: <strong id="count-safe">0</strong></span>
-      <span class="badge b-total">Total: <strong id="count-total">0</strong></span>
-            <span id="summary-mode" class="meta" style="margin-left:auto;">Static</span>
+      <span class="badge b-lo">Low: <strong id="count-low">7</strong></span>
+      <span class="badge b-safe">Safe: <strong id="count-safe">1</strong></span>
+      <span class="badge b-total">Total: <strong id="count-total">15</strong></span>
     </div>
     <p class="meta">
       This page contains **cookie manipulation** scenarios only: insecure attributes, user-controlled values, over-permissive scope,
       deletion patterns, and leakage. There are <em>no</em> HTML sinks here (no <code>document.write</code>/<code>innerHTML</code>).
+      Taint/exfil flows are normalised to <strong>High</strong>; configuration/hygiene issues default to <strong>Low</strong>;
+      sanitised examples are marked <strong>Safe</strong>.
     </p>
 
-    <div class="controls">
-      <input id="cookieValue" type="text" value="%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E" />
-      <button class="btn" onclick="cookieUtils.setCookie('ptk_payload', document.getElementById('cookieValue').value, 1)">Set ptk_payload (raw)</button>
-      <button class="btn" onclick="cookieUtils.setCookie('ptk_payload', encodeURIComponent(document.getElementById('cookieValue').value), 1)">Set ptk_payload (encoded)</button>
-      <button class="btn" onclick="(function(){document.cookie='ptk_payload=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';alert('Cleared');})()">Clear ptk_payload</button>
-    </div>
 
     <!-- Inline scenarios (no sinks) -->
     <h2 class="section-title">Inline scenarios</h2>
     <div class="grid">
+      <div class="card">
+        <div class="card-meta"><strong>Element value</strong></div>
+        <div class="field">
+          <input id="element" type="text" value="alert('1')" />
+        </div>
+      </div>
 
-      <div class="card" data-severity="high" id="il-1">
+      <div class="card" data-rule="taint" data-severity="high, low" id="il-1">
         <div class="card-meta">INLINE-1 (High): Set cookie from user-controlled <code>location.hash</code> without attributes</div>
         <pre>// inline-script[#1]
 (function(){
@@ -181,59 +57,59 @@
   document.cookie = "ptk_from_hash=" + v + "; path=/";
 })();</pre>
         <script>
-          (function(){
+          (function() {
             var v = location.hash ? location.hash.slice(1) : '';
             document.cookie = "ptk_from_hash=" + v + "; path=/";
           })();
         </script>
       </div>
 
-      <div class="card" data-severity="medium" id="il-2">
-        <div class="card-meta">INLINE-2 (Medium): Set cookie from <code>location.search</code> with <code>SameSite=None</code> but missing <code>Secure</code></div>
+      <div class="card" data-rule="taint" data-severity="high, low" id="il-2">
+        <div class="card-meta">INLINE-2 (High): Set cookie from <code>location.search</code> with <code>SameSite=None</code> but missing <code>Secure</code></div>
         <pre>// inline-script[#2]
 (function(){
   var q = location.search ? location.search.substring(1) : '';
   document.cookie = "ptk_from_query=" + q + "; Path=/; SameSite=None";
 })();</pre>
         <script>
-          (function(){
+          (function() {
             var q = location.search ? location.search.substring(1) : '';
             document.cookie = "ptk_from_query=" + q + "; Path=/; SameSite=None";
           })();
         </script>
       </div>
 
-      <div class="card" data-severity="medium" id="il-3">
-        <div class="card-meta">INLINE-3 (Medium): Over-permissive scope — <code>Domain</code>=current hostname and <code>Path=/</code></div>
+      <div class="card" data-rule="config" data-severity="high, low" id="il-3">
+        <div class="card-meta">INLINE-3 (High): External source and inline sink</code></div>
         <pre>// inline-script[#3]
 (function(){
-  var host = location.hostname;
-  document.cookie = "ptk_scope=1; Domain=" + host + "; Path=/";
+  var value = getLocationHash();
+  document.cookie = value;
 })();</pre>
         <script>
-          (function(){
-            var host = location.hostname;
-            document.cookie = "ptk_scope=1; Domain=" + host + "; Path=/";
+          (function() {
+            var value = getLocationHash();
+            document.cookie = value;
           })();
         </script>
       </div>
 
-      <div class="card" data-severity="low" id="il-4">
-        <div class="card-meta">INLINE-4 (Low): Excessive lifetime — far future expiry</div>
+      <div class="card" data-rule="config" data-severity="high, low" id="il-4">
+        <div class="card-meta">INLINE-4 (High): External source and external sink</div>
         <pre>// inline-script[#4]
 (function(){
-  var d = new Date(); d.setFullYear(d.getFullYear() + 10);
-  document.cookie = "ptk_persist=1; Expires=" + d.toUTCString() + "; Path=/";
+  var value = getElementValue('element');
+  setCookie(value);
 })();</pre>
         <script>
-          (function(){
-            var d = new Date(); d.setFullYear(d.getFullYear() + 10);
-            document.cookie = "ptk_persist=1; Expires=" + d.toUTCString() + "; Path=/";
+          (function() {
+            var value = getElementValue('element');
+            setCookie(value);
           })();
         </script>
       </div>
 
-      <div class="card" data-severity="safe" id="il-5">
+      <div class="card" data-rule="safe" data-severity="safe" id="il-5">
         <div class="card-meta">INLINE-5 (Safe): Proper attributes + encoded value</div>
         <pre>// inline-script[#5]
 (function(){
@@ -241,7 +117,7 @@
   document.cookie = "ptk_safe=" + val + "; Path=/; Secure; SameSite=Strict";
 })();</pre>
         <script>
-          (function(){
+          (function() {
             var val = encodeURIComponent("safe-value");
             document.cookie = "ptk_safe=" + val + "; Path=/; Secure; SameSite=Strict";
           })();
@@ -253,52 +129,27 @@
     <h2 class="section-title">External scenarios (click to run)</h2>
     <div class="grid">
 
-      <div class="card" data-severity="high">
-        <div class="card-meta"><strong>Insecure sets (user-controlled values, weak attributes)</strong></div>
+      <div class="card" data-rule="taint">
+        <div class="card-meta"><strong>Insecure sets : user-controlled values, weak attributes</strong></div>
+        <pre>onclick="runCookieFromHashNoAttrs()"</pre>
         <div class="controls">
-          <button class="btn" onclick="runCookieFromHashNoAttrs()">EXT: from hash (no attributes)</button>
-          <button class="btn" onclick="runCookieFromQuerySameSiteNoneNoSecure()">EXT: SameSite=None, no Secure</button>
-          <button class="btn" onclick="runCookieWildcardScope()">EXT: broad scope (Domain/Path)</button>
-          <button class="btn" onclick="runCookieLongExpiry()">EXT: long expiry</button>
+          <button class="btn" data-severity="high, low" onclick="runCookieFromHashNoAttrs()">EXT: from hash (no attributes) - High</button>
         </div>
-      </div>
-
-      <div class="card" data-severity="high">
-        <div class="card-meta"><strong>Leakage / exfiltration</strong></div>
+        <pre>onclick="javascript:document.cookie = getLocationSearch();"</pre>
         <div class="controls">
-          <button class="btn" onclick="runCookieLeakImage()">EXT: leak via Image beacon</button>
-          <button class="btn" onclick="runCookieLeakFetch()">EXT: leak via fetch()</button>
-          <button class="btn" onclick="runCookieLeakPostMessage()">EXT: leak via postMessage</button>
+          <button class="btn" data-severity="high, low" onclick="javascript:document.cookie = getLocationSearch();">EXT: from location.search - High</button>
         </div>
-        <p class="meta">Targets use <code>example.com</code> placeholders; adjust as needed for local testing.</p>
-      </div>
-
-      <div class="card" data-severity="safe">
-        <div class="card-meta"><strong>Safe patterns</strong></div>
+        <pre>onclick="setCookieString(getElementValue('element'));"</pre>
         <div class="controls">
-          <button class="btn" onclick="runCookieSafeStrict()">EXT: Secure + SameSite=Strict + encoded</button>
-          <button class="btn" onclick="runCookieDeleteProper()">EXT: proper delete (Path=/)</button>
-        </div>
-      </div>
-
-      <div class="card" data-severity="medium">
-        <div class="card-meta"><strong>Event-driven cookie mutations</strong></div>
-        <div class="controls">
-          <input id="ext_cookie_input" type="text" value="user%3D123" />
-          <button class="btn" onclick="extCookieSetFromField('ext_cookie_input')">EXT: set from field (raw)</button>
-          <button class="btn ext-cookie-scope-button" data-field="ext_cookie_input">EXT: delegated — set with Domain/Path</button>
+          <button class="btn" data-severity="high, low" onclick="setCookieString(getElementValue('element'));">EXT: from element.value - High</button>
         </div>
       </div>
 
     </div>
-
     <footer>PTK SAST testbed — Cookie security (no HTML sinks). <a class="back" href="index.html">Back to index</a></footer>
   </div>
 
-  <!-- External scripts -->
-  <script src="js/cookie/cookie_utils.js"></script>
-  <script src="js/cookie/cookie_insecure_sets.js"></script>
-  <script src="js/cookie/cookie_leakage_cases.js"></script>
-  <script src="js/cookie/cookie_event_handlers.js"></script>
+
 </body>
+
 </html>

@@ -1,15 +1,118 @@
-<!DOCTYPE html>
-<html><head><meta charset='utf-8'><title>IAST/SAST Testcases</title></head><body>
-<h1>IAST/SAST Testcases Index</h1>
-<ul>
-<li><a href='document_write.html'>document_write.html</a></li>
-<li><a href='inner_html.html'>inner_html.html</a></li>
-<li><a href='insert_adjacent_html.html'>insert_adjacent_html.html</a></li>
-<li><a href='append_child.html'>append_child.html</a></li>
-<li><a href='eval.html'>eval.html</a></li>
-<li><a href='function_constructor.html'>function_constructor.html</a></li>
-<!-- <li><a href='post_message.html'>post_message.html</a></li> -->
-<li><a href='open_redirect.html'>open_redirect.html</a></li>
-<li><a href='secrets.html'>secrets.html</a></li>
-<li><a href='cookie.html'>cookie.html</a></li>
-</ul></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DOM-based test cases — Index</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="./css/index.css" type="text/css" />
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <h1 class="title">PTK SAST testbed — DOM scenarios</h1>
+      <span class="badge">Total scenarios: <strong>15</strong></span>
+    </div>
+    <p class="meta">
+      Each page focuses on a specific DOM sink or data-flow pattern and now follows a unified layout.
+      Use the cards below to jump straight into inline vs. external variants, summaries, and safe counter-examples.
+    </p>
+
+    <div class="grid">
+      <a class="card" href="cookie.html">
+        <div class="tag">Cookies</div>
+        <h2 class="card-title">Cookie security</h2>
+        <p>Cookie mutations, leakage vectors, and safe configurations across inline and external scripts.</p>
+      </a>
+
+      <a class="card" href="document_write.html">
+        <div class="tag">HTML sinks</div>
+        <h2 class="card-title"><code>document.write</code> / <code>writeln</code></h2>
+        <p>Direct writes, cross-source payloads, dynamic wrappers, and delegated event handlers.</p>
+      </a>
+
+      <a class="card" href="inner_html.html">
+        <div class="tag">HTML sinks</div>
+        <h2 class="card-title"><code>innerHTML</code></h2>
+        <p>Inline cases plus external triggers for DOM sources, storage, and template-style builders.</p>
+      </a>
+
+      <a class="card" href="insert_adjacent_html.html">
+        <div class="tag">HTML sinks</div>
+        <h2 class="card-title"><code>insertAdjacentHTML</code></h2>
+        <p>Coverage for positional inserts, storage sources, and delegated handlers feeding raw markup.</p>
+      </a>
+
+      <a class="card" href="append_child.html">
+        <div class="tag">DOM APIs</div>
+        <h2 class="card-title"><code>appendChild</code></h2>
+        <p>Demonstrates DOM node construction from untrusted strings and safer text-node alternatives.</p>
+      </a>
+
+      <a class="card" href="eval.html">
+        <div class="tag">Dynamic execution</div>
+        <h2 class="card-title"><code>eval</code> family</h2>
+        <p>Classic <code>eval</code>, storage-driven payloads, string wrappers, and allowlisted JSON execution.</p>
+      </a>
+
+      <a class="card" href="function_constructor.html">
+        <div class="tag">Dynamic execution</div>
+        <h2 class="card-title"><code>new Function()</code></h2>
+        <p>Function constructor flows from multiple sources, builder patterns, and structured safe handling.</p>
+      </a>
+
+      <a class="card" href="open_redirect.html">
+        <div class="tag">Navigation</div>
+        <h2 class="card-title">Open redirects</h2>
+        <p>Open redirect sink with optional navigation, URL builders, and allowlist-focused mitigations.</p>
+      </a>
+
+      <a class="card" href="link_manipulation.html">
+        <div class="tag">Navigation</div>
+        <h2 class="card-title">Link manipulation</h2>
+        <p>Anchor <code>href</code> tampering, delegated setters, storage sources, and safe allowlisted normalisation.</p>
+      </a>
+
+      <a class="card" href="web_message.html">
+        <div class="tag">Messaging</div>
+        <h2 class="card-title">Web message handling</h2>
+        <p>postMessage usage, origin validation pitfalls, wildcard targetOrigin, and structured payload hardening.</p>
+      </a>
+
+      <a class="card" href="dom_selector.html">
+        <div class="tag">Selectors</div>
+        <h2 class="card-title">DOM selector injection</h2>
+        <p>CSS selector taint flows, wildcard postMessage helpers, weak origin checks, and escaped allow-list examples.</p>
+      </a>
+
+      <a class="card" href="client_injection.html">
+        <div class="tag">Data sinks</div>
+        <h2 class="card-title">Client-side JSON / SQL / XPath</h2>
+        <p>eval-based JSON parsing, WebSQL concatenation, XPath with raw user input, plus safe validation patterns.</p>
+      </a>
+
+      <a class="card" href="ajax_request_header.html">
+        <div class="tag">Ajax</div>
+        <h2 class="card-title">Ajax request headers</h2>
+        <p>XHR header manipulation, wildcard postMessage listeners, and header allow-list examples.</p>
+      </a>
+
+      <a class="card" href="dom_data_manipulation.html">
+        <div class="tag">DOM data manipulation</div>
+        <h2 class="card-title">DOM data manipulation</h2>
+        <p>formAction/target/method/value/placeholder, style/cssText/background*, document.title, history state, createHTMLDocument.</p>
+      </a>
+
+      <a class="card" href="secrets.html">
+        <div class="tag">Static analysis</div>
+        <h2 class="card-title">Secrets fixture</h2>
+        <p>Comment and string literals containing fake secrets to test token-detection rules and heuristics.</p>
+      </a>
+    </div>
+
+    <p class="footer">
+      Need a specific scenario? Open a card above or adjust payloads directly in the address bar.
+      For PTK SAST automation, point your crawler at <strong>index.html</strong> to enumerate the fixtures.
+    </p>
+  </div>
+</body>
+</html>

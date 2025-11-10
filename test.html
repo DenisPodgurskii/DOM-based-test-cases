@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>DOM-based test cases — Cookie security</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- External scripts -->
+</head>
+
+<body>
+  <div class="container">
+    <div class="topbar">
+      <a class="back" href="index.html">← Back to index</a>
+      <h1 class="title">DOM-based test cases — <code>document.cookie</code> security</h1>
+    </div>
+    <div class="summary">
+      <span class="badge b-hi">High: <strong id="count-high">0</strong></span>
+      <span class="badge b-med">Medium: <strong id="count-medium">0</strong></span>
+      <span class="badge b-lo">Low: <strong id="count-low">0</strong></span>
+      <span class="badge b-safe">Safe: <strong id="count-safe">0</strong></span>
+      <span class="badge b-total">Total: <strong id="count-total">0</strong></span>
+    </div>
+    <p class="meta">
+      This page contains **cookie manipulation** scenarios only: insecure attributes, user-controlled values, over-permissive scope,
+      deletion patterns, and leakage. There are <em>no</em> HTML sinks here (no <code>document.write</code>/<code>innerHTML</code>).
+      Taint/exfil flows are normalised to <strong>Medium</strong>; configuration/hygiene issues default to <strong>Low</strong>;
+      sanitised examples are marked <strong>Safe</strong>.
+    </p>
+
+
+    <!-- Inline scenarios (no sinks) -->
+    <h2 class="section-title">Inline scenarios</h2>
+    <div class="grid">
+
+
+
+      <div class="card" data-rule="config" data-severity="low" id="il-4">
+        <div class="card-meta">INLINE-4 (Medium): External source and external sink</div>
+        <script>
+          window.parseJsonWithEval = window.parseJsonWithEval || function(str) {
+            return eval('(' + str + ')');
+          };
+
+
+          function runJsonEval() {
+            const payload = document.getElementById('jsonPayloadInput')?.value || '{}';
+            try {
+              const obj = parseJsonWithEval(payload);
+              appendLog("eval() parsed object: " + JSON.stringify(obj));
+            } catch (err) {
+              appendLog("eval() threw " + err);
+            }
+          }
+
+
+          runJsonEval()
+        </script>
+      </div>
+
+
+      <footer>PTK SAST testbed — Cookie security (no HTML sinks). <a class="back" href="index.html">Back to index</a></footer>
+    </div>
+
+
+</body>
+
+</html>

@@ -9,19 +9,13 @@
   <!-- External scripts -->
   <script src="js/sources.js"></script>
   <script src="js/append_child/append_child_sink.js"></script>
-  <script src="js/append_child/append_child_external_sources.js"></script>
 
 
   <script>
     function setHashPayload() {
-      const payload = "%3Cscript%3Ealert('qs')%3C/script%3E";
-      location.hash = payload;
+      const payload = "<div class='hash-node'><img src=x onerror=alert('appendChild hash')></div>";
+      location.hash = encodeURIComponent(payload);
     }
-  </script>
-
-  <script src="js/summary.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', updateSummary);
   </script>
 </head>
 
@@ -32,45 +26,42 @@
       <h1 class="title">DOM-based test cases — <code>appendChild()</code></h1>
     </div>
     <div class="summary">
-      <span class="badge b-hi">High: <strong id="count-high">13</strong></span>
+      <span class="badge b-hi">High: <strong id="count-high">0</strong></span>
       <span class="badge b-med">Medium: <strong id="count-medium">0</strong></span>
-      <span class="badge b-lo">Low: <strong id="count-low">5</strong></span>
-      <span class="badge b-safe">Safe: <strong id="count-safe">1</strong></span>
-      <span class="badge b-total">Total: <strong id="count-total"></strong></span>
+      <span class="badge b-lo">Low: <strong id="count-low">0</strong></span>
+      <span class="badge b-safe">Safe: <strong id="count-safe">0</strong></span>
+      <span class="badge b-total">Total: <strong id="count-total">0</strong></span>
     </div>
     <p class="meta">Payloads are converted into DOM nodes via <code class="inline">appendChild</code>, using <code class="inline">innerHTML</code> under the hood to keep the sink realistic.</p>
-    <p class="meta"><strong>NOTE:</strong> This is the case where we can expect 4 additional findings for DOM-based JavaScript Injection (taint flow).
-      It happens due to <strong><code class="inline">createContextualFragment</code></strong> and <strong><code class="inline">appendChild</code></strong> combination being modelled as 2 separate sinks in the SAST engine.
-      In a real-world scenario, these 2 calls always happen together, so the findings are effectively duplicates. We keep both findings here to demonstrate the issue.</p>
-    <p class="meta">The <code class="inline">appendChildUtils.appendChildSink</code> utility function used in these test cases is defined as follows:
-    <pre>
-  function appendChildSink(payload, targetId) {
-    var target = ensureTarget(targetId);
-    const fragment = document.createRange().createContextualFragment(payload);
-    target.appendChild(fragment);
-  }
-  </pre>
-
-    </p>
-
 
     <div class="controls">
       <a class="btn secondary" href="?payload=%3Cscript%3Ealert('qs')%3C/script%3E">Use query payload</a>
       <button class="btn secondary" type="button" onclick="setHashPayload()">Set hash payload</button>
     </div>
 
+    <div class="card">
+      <div class="card-meta"><strong>Preloaded values for external scenarios</strong></div>
+      <ul>
+        <li>Cookie <code class="inline">payload</code>: <span id="bootstrap-cookie">(pending)</span></li>
+        <li><code class="inline">localStorage.payload</code>: <span id="bootstrap-ls">(pending)</span></li>
+        <li><code class="inline">sessionStorage.payload</code>: <span id="bootstrap-ss">(pending)</span></li>
+        <li><code class="inline">window.name</code>: <span id="bootstrap-wn">(pending)</span></li>
+        <li><code class="inline">document.referrer</code>: <span id="bootstrap-ref">(pending)</span></li>
+      </ul>
+    </div>
+
     <!-- Inline scenarios -->
     <h2 class="section-title">Inline scenarios</h2>
     <div class="grid">
 
-      <div class="card" data-severity="high, low" id="il-1">
+      <div class="card" data-severity="high" id="il-1">
         <div class="card-meta">INLINE-1 (High): Query/hash → <code class="inline">appendChild</code></div>
-        <pre data-severity="low">// inline-script[#1]
+        <pre>// inline-script[#1]
 (function(){
   const target = 'inline-appendchild-target';
   function render(payload) {
     appendChildUtils.clear(target);
-    appendChildUtils.appendChildSink(payload, target);
+    appendChildSink(payload, target);
   }
   const params = new URLSearchParams(location.search);
   if (params.has('payload')) render(params.get('payload'));
@@ -92,7 +83,7 @@
             function render(payload) {
               if (payload == null) return;
               appendChildUtils.clear(target);
-              appendChildUtils.appendChildSink(payload, target);
+              appendChildSink(payload, target);
             }
             const params = new URLSearchParams(location.search);
             if (params.has('payload')) render(params.get('payload'));
@@ -115,14 +106,13 @@
         </script>
       </div>
 
-
-      <div class="card" data-severity="high, low" id="il-2">
+      <div class="card" data-severity="high" id="il-2">
         <div class="card-meta">INLINE-2 (High): Field → <code class="inline">appendChild</code></div>
         <pre>// inline-script[#2]
 function inlineAppendChildFromField(fieldId, targetId) {
   const el = document.getElementById(fieldId);
   if (!el) return;
-  appendChildUtils.appendChildSink(el.value, targetId);
+  appendChildSink(el.value, targetId);
 }</pre>
         <div class="field">
           <input id="inline_appendchild_payload" type="text" value="<div onclick=alert('inline')>Click me</div>" />
@@ -132,32 +122,13 @@ function inlineAppendChildFromField(fieldId, targetId) {
           function inlineAppendChildFromField(fieldId, targetId) {
             const el = document.getElementById(fieldId);
             if (!el) return;
-            appendChildUtils.appendChildSink(el.value, targetId);
-          }
-        </script>
-      </div>
-
-
-
-      <div class="card" data-severity="high, low" id="il-2">
-        <div class="card-meta">INLINE-3 (High): jQuery → <code class="inline">append</code></div>
-        <pre>// inline-script[#2]
-function jQueryAppend(fieldId, targetId) {
-  $(`#${targetId}`).append(document.getElementById(fieldId).value);
-}</pre>
-        <div class="field">
-          <input id="inline_appendchild_payload" type="text" value="<div onclick=alert('inline')>Click me</div>" />
-          <button class="btn" type="button" onclick="inlineAppendChildFromField('inline_appendchild_payload', 'inline-appendchild-target')">Append inline field</button>
-        </div>
-        <script>
-          function jQueryAppend(fieldId, targetId) {
-            $(`#${targetId}`).append(document.getElementById(fieldId).value);
+            appendChildSink(el.value, targetId);
           }
         </script>
       </div>
 
       <div class="card" data-severity="safe" id="il-3">
-        <div class="card-meta">INLINE-4 (Safe): Create element + <code class="inline">textContent</code></div>
+        <div class="card-meta">INLINE-3 (Safe): Create element + <code class="inline">textContent</code></div>
         <pre>// inline-script[#3]
 (function(){
   const params = new URLSearchParams(location.search);
@@ -188,13 +159,52 @@ function jQueryAppend(fieldId, targetId) {
     <h2 class="section-title">External scenarios (click to run)</h2>
     <div class="grid">
 
-      <div class="card" data-severity="high, low">
+      <div class="card" data-severity="high">
         <div class="card-meta"><strong>Direct DOM sources</strong></div>
-        <pre>onclick="extAppendChildFromLocalStorage()"</pre>
         <div class="controls">
-          <button class="btn" data-severity="high" type="button" onclick="extAppendChildFromLocalStorage()">EXT: URLSearchParams</button>
+          <button class="btn" type="button" onclick="extAppendChildFromHash()">EXT: location.hash</button>
+          <button class="btn" type="button" onclick="extAppendChildFromSearch()">EXT: URLSearchParams</button>
+          <button class="btn" type="button" onclick="extAppendChildFromWindowName()">EXT: window.name</button>
+          <button class="btn" type="button" onclick="extAppendChildFromReferrer()">EXT: document.referrer</button>
         </div>
         <div class="render-target" id="external-appendchild-target">External DOM source target</div>
+      </div>
+
+      <div class="card" data-severity="high">
+        <div class="card-meta"><strong>Storage &amp; cookies</strong></div>
+        <div class="controls">
+          <button class="btn" type="button" onclick="extAppendChildFromCookie()">EXT: document.cookie</button>
+          <button class="btn" type="button" onclick="extAppendChildFromLocalStorage()">EXT: localStorage</button>
+          <button class="btn" type="button" onclick="extAppendChildFromSessionStorage()">EXT: sessionStorage</button>
+        </div>
+        <div class="render-target" id="external-appendchild-storage">External storage target</div>
+      </div>
+
+      <div class="card" data-severity="medium">
+        <div class="card-meta"><strong>Wrappers &amp; builders</strong></div>
+        <div class="controls">
+          <button class="btn" type="button" onclick="extAppendChildTemplate()">EXT: template literal</button>
+          <button class="btn" type="button" onclick="extAppendChildWrapper()">EXT: wrapper function</button>
+          <button class="btn" type="button" onclick="extAppendChildDecode()">EXT: decodeURIComponent</button>
+        </div>
+        <div class="render-target" id="external-appendchild-builders">External builder target</div>
+      </div>
+
+      <div class="card" data-severity="high">
+        <div class="card-meta"><strong>Delegated events</strong></div>
+        <div class="field">
+          <input id="ext_appendchild_input" type="text" value="<div class='delegated'>Delegated append</div>" />
+          <button class="btn ext-appendchild-field-button" type="button" data-target="external-appendchild-target" data-field="ext_appendchild_input">EXT: delegated appendChild</button>
+        </div>
+      </div>
+
+      <div class="card" data-severity="safe">
+        <div class="card-meta"><strong>Safe pattern: text node</strong></div>
+        <div class="field">
+          <input id="ext_safe_appendchild_input" type="text" value="<svg/onload=alert(1)>" />
+          <button class="btn" type="button" onclick="extAppendChildSafe('ext_safe_appendchild_input')">EXT: append Text node</button>
+        </div>
+        <div class="output" id="ext-safe-appendchild-output">Awaiting payload…</div>
       </div>
 
     </div>
