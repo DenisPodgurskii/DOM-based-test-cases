@@ -10,7 +10,7 @@
   <div class="container">
     <div class="topbar">
       <h1 class="title">PTK SAST testbed — DOM scenarios</h1>
-      <span class="badge">Total scenarios: <strong>15</strong></span>
+      <span class="badge">Total scenarios: <strong>16</strong></span>
     </div>
     <p class="meta">
       Each page focuses on a specific DOM sink or data-flow pattern and now follows a unified layout.
@@ -58,6 +58,12 @@
         <div class="tag">Dynamic execution</div>
         <h2 class="card-title"><code>new Function()</code></h2>
         <p>Function constructor flows from multiple sources, builder patterns, and structured safe handling.</p>
+      </a>
+
+      <a class="card" href="javascript_injection_taint.html">
+        <div class="tag">Dynamic execution</div>
+        <h2 class="card-title">JavaScript injection (taint)</h2>
+        <p>Exercises every <code>javascript-injection-taint</code> sink: string timers, execScript, jQuery globalEval/getScript, execCommand, createContextualFragment, crypto.generateCRMFRequest, and script.text.</p>
       </a>
 
       <a class="card" href="open_redirect.html">

@@ -126,6 +126,7 @@
         <script>
           (function() {
             window.addEventListener('message', function handleRedirect(event) {
+              if(location.hash != '#redirect') return;
               window.location = event.data;
             });
           })();

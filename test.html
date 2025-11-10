@@ -36,25 +36,16 @@
 
 
       <div class="card" data-rule="config" data-severity="low" id="il-4">
+        <input type="text" id="scriptVal" value="alert(1);" style="width:100%;" />
+        <script id="script" type="text/javascript"></script>
         <div class="card-meta">INLINE-4 (Medium): External source and external sink</div>
         <script>
-          window.parseJsonWithEval = window.parseJsonWithEval || function(str) {
-            return eval('(' + str + ')');
-          };
+          (function() {
+            const scriptTag = document.getElementById('script');
+            const scriptVal = document.getElementById('scriptVal').value;
+            scriptTag.textContent = scriptVal
 
-
-          function runJsonEval() {
-            const payload = document.getElementById('jsonPayloadInput')?.value || '{}';
-            try {
-              const obj = parseJsonWithEval(payload);
-              appendLog("eval() parsed object: " + JSON.stringify(obj));
-            } catch (err) {
-              appendLog("eval() threw " + err);
-            }
-          }
-
-
-          runJsonEval()
+          })();
         </script>
       </div>
 
